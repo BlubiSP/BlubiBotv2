@@ -3,17 +3,19 @@ from json import dumps, load
 from typing import Literal
 from asyncio import run_coroutine_threadsafe
 from datetime import datetime as dt
+
+
+# ID of your Server
+GUILD_ID = 123456789001234567890
 # path where the playlist and favorites is saved as playlist.json
 SONGLIST_PATH = "C:/Users/username/Desktop/"
 # path to music folder
 MUSIC_PATH = "C:/Users/username/Music/"
 # path to ffmpeg.exe( you only need the .exe) you can get it at https://ffmpeg.org/download.html 
-FFMPEG_PATH = "C:/Users/stefa/Desktop/python/BlubiBotv2/ffmpeg.exe"
+FFMPEG_PATH = "C:/Users/username/Desktop/ffmpeg.exe"
 
 # % chance for favorited songs to play
 FAVORITE_CHANCE = 10
-# ID of your Server
-GUILD_ID = 123456789001234567890
 
 # Don't forget to put your bot token into Bot_token.txt
 with open("Bot_Token.txt", "r") as file:
