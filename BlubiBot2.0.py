@@ -3,18 +3,19 @@ from json import dumps, load
 from typing import Literal
 from asyncio import run_coroutine_threadsafe
 from datetime import datetime as dt
-
-SONGLIST_PATH = "C:/Users/stefa/Desktop/python/BlubiBotv2/"
-MUSIC_PATH = "C:/Users/stefa/Music/"
+# path where the playlist and favorites is saved as playlist.json
+SONGLIST_PATH = "C:/Users/username/Desktop/"
+# path to music folder
+MUSIC_PATH = "C:/Users/username/Music/"
+# path to ffmpeg.exe( you only need the .exe) you can get it at https://ffmpeg.org/download.html 
 FFMPEG_PATH = "C:/Users/stefa/Desktop/python/BlubiBotv2/ffmpeg.exe"
+
 # % chance for favorited songs to play
 FAVORITE_CHANCE = 10
-GUILD_ID = 1099352065702101064
-###testing
-MAIN_GUILD = 124792011487313924
-TEST_GUILD = 1099352065702101064
-###
+# ID of your Server
+GUILD_ID = 123456789001234567890
 
+# Don't forget to put your bot token into Bot_token.txt
 with open("Bot_Token.txt", "r") as file:
     BOT_TOKEN = file.read()
 
@@ -26,7 +27,6 @@ class MyClient(discord.Client):
         self.tree = discord.app_commands.CommandTree(self)
 
     async def on_ready(self):
-        #await self.tree.sync()
         print("I am ready!")
 
     async def setup_hook(self) -> None:
@@ -50,34 +50,25 @@ current_song = None
 async def load_folder(interaction: discord.Interaction):
     """ Load Songs from MUSIC_PATH into playlist.json"""
 
-    print("Checking if playlist.json exists...")
-    if os.path.exists(f"{SONGLIST_PATH}playlist.json"):
-        print("It does...")
-        song_dict = load_json()
-
-    else:
-        print("It does not....")
-        song_dict = {}
+    song_dict = {}
         
     #creates a list of all files that end in .mp3 or .webm in MUSIC_PATH
     song_list = [song for song in os.listdir(MUSIC_PATH) if ".mp3" in song or ".webm" in song]
     count = 0
 
-    print("Loading new songs...")
+    print("Loading songs...")
     for song_name in song_list:
-        if song_name not in song_dict.keys():
-            song_dict[song_name] = {"last_played" : "never",
-            "favorite" : False,
-            "skipped" : 0,
-            "location" : MUSIC_PATH + song_name}
-            count += 1
-            print(f"Added {song_name}")
-        else:
-            print(f"Duplicate found: {song_name} Skipping...")
+        song_dict[song_name] = {"last_played" : "never",
+        "favorite" : False,
+        "skipped" : 0,
+        "location" : MUSIC_PATH + song_name}
+        count += 1
+        print(f"Added {song_name}")
 
     with open(f"{SONGLIST_PATH}playlist.json", "w") as file:
         file.write(dumps(song_dict))
-    
+        print("Saved songs in playlist.json")
+
     if count > 0:    
         await interaction.response.send_message(f"""
             Added {count} new Songs!
@@ -85,13 +76,13 @@ async def load_folder(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("No new songs found.")
 
-
+# Use this if the bot has problems playing songs 
 @client.tree.command(name = "verify_playlist",guild=discord.Object(id=GUILD_ID))     
 async def verify_playlist(interaction: discord.Interaction):
     """Verify that all songs from playlist.json are also in MUSIC_PATH. CAUTION this deletes all entries from playlist.json that are not in the current MUSIC_PATH"""
 
     await interaction.response.send_message("Checking if playlist and MUSIC_PATH match...")
-    song_dict = load_json()
+    song_dict = saved_playlist()
     song_list = [song for song in os.listdir(MUSIC_PATH) if ".mp3" in song or ".webm" in song]
     missing_songs = [song for song in song_dict.keys() if song not in song_list]
     if missing_songs:
@@ -99,6 +90,7 @@ async def verify_playlist(interaction: discord.Interaction):
             print(f"Deleted{song}")
             del song_dict[song]
         return await interaction.followup.send(f"Found {len(missing_songs)} songs that are in playlist.json but not in MUSIC_PATH and deleted them.")  
+    
     return await interaction.followup.send("Everything is fine.")
         
 
@@ -108,7 +100,9 @@ async def play(interaction: discord.Interaction, category: Literal["new", "all",
     """Start playing Music. Make sure to use /join first!"""
 
     global playlist, favorite
-    song_dict = load_json()
+
+    song_dict = saved_playlist()
+
     if len(song_dict) == 0:
         return await interaction.response.send_message("No songs in playlist\nUse /load_folder to load songs")
     
@@ -136,17 +130,19 @@ async def play(interaction: discord.Interaction, category: Literal["new", "all",
     random.shuffle(playlist)
 
     await interaction.followup.send(f"Playing {len(playlist)} Songs")
+
     try:
         await play_song(interaction.guild.voice_client)
     except discord.ClientException as e:
-        await interaction.followup.send(f"{e}\nBot is now desynced please restart it")
+        await interaction.followup.send(f"{e}\nYou probably use /play twice.\nBot is now desynced please restart it")
 
 
 @client.tree.command(name = "favorite", guild=discord.Object(id=GUILD_ID))
 async def favorite(interaction: discord.Interaction):
     """Favorite the current song to increase the chance of it playing again!"""
-    song_dict = load_json()
+    song_dict = saved_playlist()
     if current_song:
+        #adds favorite to current song
         with open(SONGLIST_PATH + "playlist.json", "w") as file:
             song_dict[current_song]["favorite"] = True
             file.write(dumps(song_dict))
@@ -169,12 +165,14 @@ async def songname(interaction: discord.Interaction):
         return await interaction.response.send_message(f"Current or last song is: {current_song}")
     return await interaction.response.send_message("I am not playing anything.")
 
+
 @client.tree.command(name = "skip", guild=discord.Object(id=GUILD_ID))
 async def skip(interaction: discord.Interaction):
     """Skips current song"""
     try:
         if interaction.guild.voice_client.is_playing():
-            song_dict = load_json()
+            song_dict = saved_playlist()
+            #adds 1 to the skip counter in the playlist.json file
             with open(SONGLIST_PATH + "playlist.json", "w") as file:
                 song_dict[current_song]["skipped"] += 1
                 file.write(dumps(song_dict))
@@ -204,15 +202,15 @@ async def resume(interaction: discord.Interaction):
 
 
 @client.tree.command(name = "last", guild=discord.Object(id=GUILD_ID))
-async def next_songs(interaction: discord.Interaction):
-    """Shows the last 5 Songs"""
+async def last(interaction: discord.Interaction):
+    """Shows the last Songs (up to 5)"""
     if last5:
         response = f"Here are the last {len(last5)} songs:\n"
         for song in last5:
             response += song + "\n"
         return await interaction.response.send_message(response)
         
-    await interaction.response.send_message("There are no played songs")
+    return await interaction.response.send_message("There are no played songs")
 
 
 @client.tree.command(name = "next_songs", guild=discord.Object(id=GUILD_ID))
@@ -220,14 +218,14 @@ async def next_songs(interaction: discord.Interaction, number_of_songs : int = 5
     """Shows the next number of songs. Default 5"""
     if playlist:
         count = 0
-        response = f"\n"
+        response = ""
         for n in range(number_of_songs):
             try:
                 response += playlist[n] + "\n"
                 count +=1
             except IndexError as e:
                 print(e)
-        return await interaction.response.send_message(f"Here are the next {count} songs:" + response)
+        return await interaction.response.send_message(f"Here are the next {count} songs\n:" + response)
         
     await interaction.response.send_message("Playlist is empty.")
 
@@ -253,15 +251,8 @@ async def dc(interaction: discord.Interaction):
         await interaction.guild.voice_client.disconnect()
         voice_client = None
         return await interaction.response.send_message("Bye!")
-    #testing
     return await interaction.response.send_message("I am not connected to any voice channel on this server!")
 
-
-#testing
-@client.tree.command(name = "test", guild=discord.Object(id=GUILD_ID))
-async def test(interaction: discord.Interaction):
-    """For testing only. Most likely does nothing"""
-    return await interaction.response.send_message("Nothing")
 
 
 async def play_song(voice_client):
@@ -269,7 +260,8 @@ async def play_song(voice_client):
     if len(playlist) == 0:
         return
     
-    #roll for favorite
+    # gets next song with a chance of picking a favorite instead
+    # picking either of them removes them from their respective pool
     roll = random.randint(1, 100)
     if roll < FAVORITE_CHANCE and len(favorite) > 0:
         print("Picking from Favorites")
@@ -278,21 +270,21 @@ async def play_song(voice_client):
         print("Picking from playlist")
         current_song = playlist.pop(0)
 
-    #update last5 played songs
+    # update last5 played songs
     if len(last5) < 5:
         last5.append(current_song)
     else:
         last5.pop(0)
         last5.append(current_song)
     
-    #play song
     print(f"Now playing: {current_song}")
-    song_dict = load_json()
+    song_dict = saved_playlist()
     with open(SONGLIST_PATH + "playlist.json", "w") as file:
         song_dict[current_song]["last_played"] = dt.now().strftime("%d/%m/%Y, %H:%M")
         file.write(dumps(song_dict))
     songFilePath = MUSIC_PATH + current_song
     source = discord.FFmpegPCMAudio(source = songFilePath, executable = FFMPEG_PATH ,options="-b:a 128k")
+    # starts playing the file, and repeats the play_song function after song is over
     voice_client.play(source, after=dispatch_play_song)
 
 
@@ -312,7 +304,7 @@ def dispatch_play_song(e):
     return
 
 
-def load_json():
+def saved_playlist():
     if os.path.exists(f"{SONGLIST_PATH}playlist.json"):
         with open(SONGLIST_PATH + "playlist.json", "r", encoding="UTF-8") as file:
             song_dict = load(file)
@@ -320,5 +312,4 @@ def load_json():
     return {}
 
 
-client.run(BOT_TOKEN) 
-           #log_handler=None)
+client.run(BOT_TOKEN, log_handler=None)
