@@ -1,8 +1,18 @@
-# A Discord bot made with Python
-__Play your own music files in Discord.__
+# A Discord bot that plays music files from your computer
 
-This bot plays your local music using the discord 2.1.0 library and the new slash commands!.
+This bot plays your local music files using FFPMEG, the discord 2.1.0 library and the new slash commands!
 
+<<<<<<< HEAD
+=======
+Build using Python
+
+# Features
+1. Playlists: You enter a whole folder and the bot plays all music files in that folder
+2. Favorites: You can favorite songs to increase their chance of being played
+3. Play new songs only: Only plays songs that have not been played before
+
+
+>>>>>>> 7550b1d9e88c0915d23fd45c38f11a88dcc2581a
 # Setup
 1. Put your bot token into Bot_Token.txt
 
